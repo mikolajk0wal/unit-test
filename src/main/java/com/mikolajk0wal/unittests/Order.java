@@ -1,27 +1,30 @@
 package com.mikolajk0wal.unittests;
 
-import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.Type;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.List;
 import java.util.UUID;
 
 @Entity
 @Table(name = "orders")
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 class Order {
     @Id
+    @EqualsAndHashCode.Include
     private UUID id;
 
     @Column(name = "lines", columnDefinition = "jsonb")
-    // @Type(JsonBinaryType.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     private List<OrderLine> lines;
 
     @Embedded
