@@ -9,15 +9,14 @@ import java.util.stream.Collectors;
 
 @Component
 class PriceCalculator {
-    PriceBreakdown calculate(Map<Product, Integer> productsWithQuantities) {
-        Map<UUID, BigDecimal> pricingLines = productsWithQuantities.entrySet().stream()
-                .collect(Collectors.toMap(
-                        entry -> entry.getKey().id(),
-                        entry -> entry.getKey().price().multiply(BigDecimal.valueOf(entry.getValue()))
-                ));
+    PriceBreakdown calculate(PricingContext pricingContext) {
+        Map<UUID, Money> pricingLines = pricingContext.productsWithQuantities().entrySet().stream()
+                .collect(Collectors.toMap(entry -> entry.getKey().id(),
+                        entry -> pricingContext.exchangeRates()
+                                .convert(entry.getKey().price(), pricingContext.targetCurrency())
+                                .multiply(BigDecimal.valueOf(entry.getValue()))));
 
-        BigDecimal total = pricingLines.values().stream()
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        Money total = pricingLines.values().stream().reduce(Money.zero(pricingContext.targetCurrency()), Money::add);
 
         return new PriceBreakdown(total, pricingLines);
     }

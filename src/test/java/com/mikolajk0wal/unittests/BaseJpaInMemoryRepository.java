@@ -20,9 +20,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
 @RequiredArgsConstructor
-public abstract class BaseJpaInMemoryRepository<T, ID> implements JpaRepository<T, ID>{
+abstract class BaseJpaInMemoryRepository<T, ID> implements JpaRepository<T, ID> {
     protected final String idFieldName;
     protected final Map<ID, T> entities = new ConcurrentHashMap<>();
+
     protected abstract ID generateId();
 
     public BaseJpaInMemoryRepository() {
@@ -194,8 +195,8 @@ public abstract class BaseJpaInMemoryRepository<T, ID> implements JpaRepository<
     }
 
     @Override
-    public <S extends T, R> R findBy(
-            Example<S> example, Function<FluentQuery.FetchableFluentQuery<S>, R> queryFunction) {
+    public <S extends T, R> R findBy(Example<S> example,
+            Function<FluentQuery.FetchableFluentQuery<S>, R> queryFunction) {
         return null;
     }
 
@@ -203,8 +204,7 @@ public abstract class BaseJpaInMemoryRepository<T, ID> implements JpaRepository<
         try {
             Field idField = findFieldInClassHierarchy(entity.getClass(), idFieldName);
             if (idField == null) {
-                throw new RuntimeException("No id field found in class hierarchy for "
-                        + entity.getClass().getName());
+                throw new RuntimeException("No id field found in class hierarchy for " + entity.getClass().getName());
             }
             idField.setAccessible(true);
             idField.set(entity, fileId);
@@ -217,8 +217,7 @@ public abstract class BaseJpaInMemoryRepository<T, ID> implements JpaRepository<
         try {
             Field idField = findFieldInClassHierarchy(entity.getClass(), idFieldName);
             if (idField == null) {
-                throw new RuntimeException("No id field found in class hierarchy for "
-                        + entity.getClass().getName());
+                throw new RuntimeException("No id field found in class hierarchy for " + entity.getClass().getName());
             }
             idField.setAccessible(true);
             return (ID) idField.get(entity);

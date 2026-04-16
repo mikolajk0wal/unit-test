@@ -5,38 +5,47 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class OrderServiceTests {
     private ProductRepository productRepository;
     private OrderRepository orderRepository;
+    private ExchangeRateProvider exchangeRateProvider;
+    private EmailService emailService;
     private OrderService orderService;
 
     @BeforeEach
     void setup() {
-        this.productRepository = new InMemoryProductRepository();
-        this.orderRepository = new InMemoryOrderRepository();
+        productRepository = new InMemoryProductRepository();
+        orderRepository = new InMemoryOrderRepository();
         PriceCalculator priceCalculator = new PriceCalculator();
 
-        this.orderService = new OrderService(productRepository, orderRepository, priceCalculator);
+        exchangeRateProvider = mock(ExchangeRateProvider.class);
+        when(exchangeRateProvider.getExchangeRates()).thenReturn(new ExchangeRates("PLN",
+                Map.of("EUR", new BigDecimal("0.25"), "GBP", new BigDecimal("0.20"), "CHF", new BigDecimal("0.22"))));
+
+        emailService = mock(EmailService.class);
+
+        orderService = new OrderService(productRepository, orderRepository, priceCalculator, exchangeRateProvider,
+                emailService);
     }
 
     @Test
-    void shouldCreateOrderWithCorrectTotalAndLines() {
-        UUID productId = UUID.randomUUID();
-        productRepository.save(new Product(productId, "Laptop", new BigDecimal("3000")));
+    void shouldCreateOrder() {
+        Product product = productRepository.save(new Product("Product", new Money("1000", "EUR")));
+        List<OrderLineRequest> requests = List.of(new OrderLineRequest(product.id(), 2));
 
-        List<OrderLineRequest> requests = List.of(new OrderLineRequest(productId, 2));
-
-        UUID orderId = orderService.createOrder(requests);
+        UUID orderId = orderService.createOrder(requests, "test@gmail.com", "PLN");
 
         Order savedOrder = orderRepository.findById(orderId).orElseThrow();
-
-        assertThat(savedOrder.getTotalPrice()).isEqualByComparingTo(new BigDecimal("6000"));
-        assertThat(savedOrder.getLines()).hasSize(1);
-        assertThat(savedOrder.getLines().get(0).linePrice()).isEqualByComparingTo(new BigDecimal("6000"));
-        assertThat(savedOrder.getLines().get(0).productId()).isEqualTo(productId);
+        assertThat(savedOrder.getTotalPrice().amount()).isEqualByComparingTo(new BigDecimal("8000"));
+        assertThat(savedOrder.getTotalPrice().currency()).isEqualTo("PLN");
+        verify(emailService).sendEmail("test@gmail.com", "Your order has been created");
     }
 }

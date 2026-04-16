@@ -13,40 +13,47 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceBadTests {
-
-    @Mock private ProductRepository productRepository;
-    @Mock private OrderRepository orderRepository;
-    @Mock private PriceCalculator priceCalculator;
+    @Mock
+    private ProductRepository productRepository;
+    @Mock
+    private OrderRepository orderRepository;
+    @Mock
+    private PriceCalculator priceCalculator;
+    @Mock
+    private EmailService emailService;
+    @Mock
+    private ExchangeRateProvider exchangeRateProvider;
 
     @InjectMocks
     private OrderService orderService;
 
     @Test
     void shouldCreateOrderSuccessfully() {
-        // GIVEN
-        UUID productId = UUID.randomUUID();
-        Product mockProduct = new Product(productId, "Laptop", new BigDecimal("3000"));
+        Product product = new Product("Product", new Money("4000", "PLN"));
+        when(productRepository.findAllById(List.of(product.id()))).thenReturn(List.of(product));
 
-        when(productRepository.findAllById(anyList())).thenReturn(List.of(mockProduct));
+        ExchangeRates exchangeRates = new ExchangeRates("PLN",
+                Map.of("EUR", new BigDecimal("0.25"), "GBP", new BigDecimal("0.20"), "CHF", new BigDecimal("0.22")));
+        when(exchangeRateProvider.getExchangeRates()).thenReturn(exchangeRates);
+        PriceBreakdown breakdown = new PriceBreakdown(new Money("8000", "PLN"),
+                Map.of(product.id(), new Money("8000", "PLN")));
+        when(priceCalculator.calculate(new PricingContext(Map.of(product, 2), exchangeRates, "PLN")))
+                .thenReturn(breakdown);
 
-        // TU JEST PROBLEM: Wycinamy logikę kalkulatora i sami podajemy wynik
-        PriceBreakdown mockBreakdown = new PriceBreakdown(new BigDecimal("6000"), Map.of(productId, new BigDecimal("6000")));
-        when(priceCalculator.calculate(anyMap())).thenReturn(mockBreakdown);
+        Order order = new Order(List.of(new OrderLine(product.id(), 2, new Money("8000", "PLN"))),
+                new Money("8000", "PLN"));
+        when(orderRepository.save(any(Order.class))).thenReturn(order);
 
-        UUID expectedOrderId = UUID.randomUUID();
-        Order expectedOrder = new Order(expectedOrderId, List.of(), new BigDecimal("6000"));
-        when(orderRepository.save(any(Order.class))).thenReturn(expectedOrder);
-
-        UUID orderId = orderService.createOrder(List.of(new OrderLineRequest(productId, 2)));
+        UUID orderId = orderService.createOrder(List.of(new OrderLineRequest(product.id(), 2)), "test@gmail.com",
+                "PLN");
 
         verify(orderRepository).save(any(Order.class));
-        assertEquals(expectedOrderId, orderId);
+        verify(emailService).sendEmail("test@gmail.com", "Your order has been created");
+        assertEquals(order.getId(), orderId);
     }
 }
