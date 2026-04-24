@@ -1,7 +1,6 @@
 package com.mikolajk0wal.unittests;
 
 import jakarta.persistence.EntityNotFoundException;
-import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Example;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -19,12 +18,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
-@RequiredArgsConstructor
 abstract class BaseJpaInMemoryRepository<T, ID> implements JpaRepository<T, ID> {
     protected final String idFieldName;
     protected final Map<ID, T> entities = new ConcurrentHashMap<>();
 
     protected abstract ID generateId();
+
+    public BaseJpaInMemoryRepository(String idFieldName) {
+        this.idFieldName = idFieldName;
+    }
 
     public BaseJpaInMemoryRepository() {
         this("id");

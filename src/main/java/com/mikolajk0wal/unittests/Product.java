@@ -4,15 +4,11 @@ import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
 
 import java.util.UUID;
 
 @Entity
 @Table(name = "products")
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
 class Product {
     @Id
     private UUID id;
@@ -27,12 +23,10 @@ class Product {
         this.price = price;
     }
 
+    protected Product() {}
+
     UUID id() {
         return id;
-    }
-
-    String name() {
-        return name;
     }
 
     Money price() {

@@ -5,22 +5,17 @@ import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.AccessLevel;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Entity
 @Table(name = "orders")
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
 class Order {
     @Id
-    @EqualsAndHashCode.Include
     private UUID id;
 
     @Column(name = "lines", columnDefinition = "jsonb")
@@ -35,16 +30,28 @@ class Order {
         this.totalPrice = totalPrice;
     }
 
-    UUID getId() {
+    protected Order() {
+    }
+
+    UUID id() {
         return id;
     }
 
-    List<OrderLine> getLines() {
-        return lines;
+
+    Money totalPrice() {
+        return totalPrice;
     }
 
-    Money getTotalPrice() {
-        return totalPrice;
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+        Order order = (Order) o;
+        return Objects.equals(id, order.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(id);
     }
 }
 

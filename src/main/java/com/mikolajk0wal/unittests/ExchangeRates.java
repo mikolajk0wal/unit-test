@@ -2,39 +2,46 @@ package com.mikolajk0wal.unittests;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-record ExchangeRates(Map<String, Map<String, BigDecimal>> rates) {
+record CurrencyPair(String from, String to) {
+}
+
+class ExchangeRates {
+    private final Map<CurrencyPair, BigDecimal> rates;
+
     ExchangeRates(String baseCurrency, Map<String, BigDecimal> baseRates) {
-        this(calculateFullMap(baseCurrency, baseRates));
+        this.rates = calculateRatesMap(baseCurrency, baseRates);
     }
 
     Money convert(Money amount, String targetCurrency) {
-        return new Money(amount.multiply(rates.get(amount.currency()).get(targetCurrency)).amount(), targetCurrency);
+        if (amount.currency().equals(targetCurrency)) {
+            return amount;
+        }
+
+        CurrencyPair pair = new CurrencyPair(amount.currency(), targetCurrency);
+        BigDecimal rate = rates.get(pair);
+
+        if (rate == null) {
+            throw new IllegalArgumentException("No rate found for: " + amount.currency() + " -> " + targetCurrency);
+        }
+
+        return new Money(amount.amount().multiply(rate), targetCurrency);
     }
 
-    /**
-     * Tworzy mapę kursów na podstawie waluty bazowej. Przykład: dla "PLN" i mapy {"EUR": 4.30} wyliczy automatycznie
-     * kurs {"EUR": {"PLN": 0.2326}}.
-     */
-    private static Map<String, Map<String, BigDecimal>> calculateFullMap(String base, Map<String, BigDecimal> rates) {
-        List<Map.Entry<String, BigDecimal>> filteredRates = rates.entrySet().stream()
-                .filter(entry -> !entry.getKey().equalsIgnoreCase(base)).toList();
+    private static Map<CurrencyPair, BigDecimal> calculateRatesMap(String base, Map<String, BigDecimal> rates) {
+        Map<String, BigDecimal> baseToAll = Stream
+                .concat(rates.entrySet().stream(), Stream.of(Map.entry(base, BigDecimal.ONE)))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        Map<String, BigDecimal> baseInnerMap = Stream
-                .concat(filteredRates.stream(),
-                        Stream.of(Map.entry(base, BigDecimal.ONE.setScale(4, RoundingMode.HALF_UP))))
-                .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
+        return baseToAll.keySet().stream().flatMap(source -> baseToAll.keySet().stream().map(target -> {
+            BigDecimal rateSourceToBase = BigDecimal.ONE.divide(baseToAll.get(source), 10, RoundingMode.HALF_UP);
+            BigDecimal rateBaseToTarget = baseToAll.get(target);
+            BigDecimal finalRate = rateSourceToBase.multiply(rateBaseToTarget).setScale(10, RoundingMode.HALF_UP);
 
-        return Stream
-                .concat(Stream.of(Map.entry(base, baseInnerMap)),
-                        filteredRates.stream()
-                                .map(entry -> Map.entry(entry.getKey(),
-                                        Map.of(base, BigDecimal.ONE.divide(entry.getValue(), 10, RoundingMode.HALF_UP),
-                                                entry.getKey(), BigDecimal.ONE.setScale(4, RoundingMode.HALF_UP)))))
-                .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
+            return Map.entry(new CurrencyPair(source, target), finalRate);
+        })).collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 }

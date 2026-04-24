@@ -11,12 +11,10 @@ import java.util.UUID;
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 class OrderServiceTests {
     private ProductRepository productRepository;
     private OrderRepository orderRepository;
-    private ExchangeRateProvider exchangeRateProvider;
     private EmailService emailService;
     private OrderService orderService;
 
@@ -26,9 +24,8 @@ class OrderServiceTests {
         orderRepository = new InMemoryOrderRepository();
         PriceCalculator priceCalculator = new PriceCalculator();
 
-        exchangeRateProvider = mock(ExchangeRateProvider.class);
-        when(exchangeRateProvider.getExchangeRates()).thenReturn(new ExchangeRates("PLN",
-                Map.of("EUR", new BigDecimal("0.25"), "GBP", new BigDecimal("0.20"), "CHF", new BigDecimal("0.22"))));
+        ExchangeRateProvider exchangeRateProvider = () -> new ExchangeRates("PLN",
+                Map.of("EUR", new BigDecimal("0.25"), "GBP", new BigDecimal("0.20"), "CHF", new BigDecimal("0.22")));
 
         emailService = mock(EmailService.class);
 
@@ -37,15 +34,24 @@ class OrderServiceTests {
     }
 
     @Test
-    void shouldCreateOrder() {
+    void shouldCreateOrderWithCorrectPrice() {
         Product product = productRepository.save(new Product("Product", new Money("1000", "EUR")));
         List<OrderLineRequest> requests = List.of(new OrderLineRequest(product.id(), 2));
 
         UUID orderId = orderService.createOrder(requests, "test@gmail.com", "PLN");
 
         Order savedOrder = orderRepository.findById(orderId).orElseThrow();
-        assertThat(savedOrder.getTotalPrice().amount()).isEqualByComparingTo(new BigDecimal("8000"));
-        assertThat(savedOrder.getTotalPrice().currency()).isEqualTo("PLN");
+        assertThat(savedOrder.totalPrice().amount()).isEqualByComparingTo(new BigDecimal("8000"));
+        assertThat(savedOrder.totalPrice().currency()).isEqualTo("PLN");
+    }
+
+    @Test
+    void shouldSendConfirmationEmail() {
+        Product product = productRepository.save(new Product("Product", new Money("1000", "EUR")));
+        List<OrderLineRequest> requests = List.of(new OrderLineRequest(product.id(), 2));
+
+        orderService.createOrder(requests, "test@gmail.com", "PLN");
+
         verify(emailService).sendEmail("test@gmail.com", "Your order has been created");
     }
 }

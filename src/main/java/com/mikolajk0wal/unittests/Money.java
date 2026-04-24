@@ -2,13 +2,13 @@ package com.mikolajk0wal.unittests;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Objects;
 
 record Money(BigDecimal amount, String currency) {
 
     Money {
-        if (amount == null || currency == null) {
-            throw new IllegalArgumentException("Amount and currency cannot be null");
-        }
+        Objects.requireNonNull(amount);
+        Objects.requireNonNull(currency);
         amount = amount.setScale(2, RoundingMode.HALF_UP);
     }
 
@@ -21,6 +21,7 @@ record Money(BigDecimal amount, String currency) {
     }
 
     Money add(Money other) {
+        Objects.requireNonNull(other);
         if (!this.currency.equals(other.currency)) {
             throw new IllegalArgumentException(
                     String.format("Cannot add different currencies: %s and %s", this.currency, other.currency));
@@ -29,6 +30,7 @@ record Money(BigDecimal amount, String currency) {
     }
 
     Money multiply(BigDecimal rate) {
+        Objects.requireNonNull(rate);
         return new Money(this.amount.multiply(rate), this.currency);
     }
 }
