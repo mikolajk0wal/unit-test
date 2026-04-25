@@ -6,8 +6,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-record CurrencyPair(String from, String to) {
-}
+record CurrencyPair(String source, String target) { }
 
 class ExchangeRates {
     private final Map<CurrencyPair, BigDecimal> rates;
@@ -16,19 +15,19 @@ class ExchangeRates {
         this.rates = calculateRatesMap(baseCurrency, baseRates);
     }
 
-    Money convert(Money amount, String targetCurrency) {
-        if (amount.currency().equals(targetCurrency)) {
-            return amount;
+    Money convert(Money money, String targetCurrency) {
+        if (money.currency().equals(targetCurrency)) {
+            return money;
         }
 
-        CurrencyPair pair = new CurrencyPair(amount.currency(), targetCurrency);
+        CurrencyPair pair = new CurrencyPair(money.currency(), targetCurrency);
         BigDecimal rate = rates.get(pair);
 
         if (rate == null) {
-            throw new IllegalArgumentException("No rate found for: " + amount.currency() + " -> " + targetCurrency);
+            throw new IllegalArgumentException("No rate found for: " + money.currency() + " -> " + targetCurrency);
         }
 
-        return new Money(amount.amount().multiply(rate), targetCurrency);
+        return new Money(money.amount().multiply(rate), targetCurrency);
     }
 
     private static Map<CurrencyPair, BigDecimal> calculateRatesMap(String base, Map<String, BigDecimal> rates) {
