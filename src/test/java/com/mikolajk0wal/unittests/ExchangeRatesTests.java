@@ -52,11 +52,11 @@ class ExchangeRatesTests {
     @Test
     void shouldMaintainPrecisionDuringCrossConversion() {
         ExchangeRates rates = new ExchangeRates("USD", Map.of("PLN", new BigDecimal("3")));
-        Money hundredPLN = new Money("100.00", "PLN");
+        Money hundredPLN = new Money("200.00", "PLN");
 
         Money result = rates.convert(hundredPLN, "USD");
 
-        assertThat(result).isEqualTo(new Money("33.33", "USD"));
+        assertThat(result).isEqualTo(new Money("66.67", "USD"));
     }
 
     @Test
