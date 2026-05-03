@@ -23,7 +23,8 @@ class Product {
         this.price = price;
     }
 
-    protected Product() {}
+    protected Product() {
+    }
 
     UUID id() {
         return id;

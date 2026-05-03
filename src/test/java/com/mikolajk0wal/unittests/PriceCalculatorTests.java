@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
 class PriceCalculatorTests {
     private final PriceCalculator calculator = new PriceCalculator();
@@ -22,6 +23,18 @@ class PriceCalculatorTests {
         assertThat(result.total()).isEqualTo(new Money("140.00", "PLN"));
         assertThat(result.pricingLines()).hasSize(2).containsEntry(p1.id(), new Money("80.00", "PLN"))
                 .containsEntry(p2.id(), new Money("60.00", "PLN"));
+    }
+
+    @Test
+    void shouldCalculatePriceForSingleProductCart() {
+        ExchangeRates rates = new ExchangeRates("PLN", Map.of());
+        Product p1 = new Product("Product 1", new Money("50.00", "PLN"));
+        PricingContext context = new PricingContext(Map.of(p1, 1), rates, "PLN");
+
+        PriceBreakdown result = calculator.calculate(context);
+
+        assertThat(result.total()).isEqualTo(new Money("50.00", "PLN"));
+        assertThat(result.pricingLines()).hasSize(1).containsEntry(p1.id(), new Money("50.00", "PLN"));
     }
 
     @Test
@@ -45,5 +58,15 @@ class PriceCalculatorTests {
 
         assertThat(result.total()).isEqualTo(Money.zero("USD"));
         assertThat(result.pricingLines()).hasSize(1).containsEntry(p1.id(), Money.zero("USD"));
+    }
+
+    @Test
+    void shouldThrowExceptionWhenProductQuantityIsNegative() {
+        ExchangeRates rates = new ExchangeRates("PLN", Map.of());
+        Product p1 = new Product("Product 1", new Money("10.00", "PLN"));
+
+        PricingContext context = new PricingContext(Map.of(p1, -1), rates, "PLN");
+
+        assertThatThrownBy(() -> calculator.calculate(context)).isInstanceOf(IllegalArgumentException.class);
     }
 }

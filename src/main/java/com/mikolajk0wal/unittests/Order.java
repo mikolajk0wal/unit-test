@@ -37,14 +37,18 @@ class Order {
         return id;
     }
 
-
     Money totalPrice() {
         return totalPrice;
     }
 
+    List<OrderLine> lines() {
+        return lines;
+    }
+
     @Override
     public boolean equals(Object o) {
-        if (o == null || getClass() != o.getClass()) return false;
+        if (o == null || getClass() != o.getClass())
+            return false;
         Order order = (Order) o;
         return Objects.equals(id, order.id);
     }

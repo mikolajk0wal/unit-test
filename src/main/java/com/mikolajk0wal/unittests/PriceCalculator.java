@@ -10,6 +10,10 @@ import java.util.stream.Collectors;
 @Component
 class PriceCalculator {
     PriceBreakdown calculate(PricingContext pricingContext) {
+        if (pricingContext.productsWithQuantities().values().stream().anyMatch(q -> q < 0)) {
+            throw new IllegalArgumentException("Quantity of product can't be less than zero");
+        }
+
         Map<UUID, Money> pricingLines = pricingContext.productsWithQuantities().entrySet().stream()
                 .collect(Collectors.toMap(entry -> entry.getKey().id(),
                         entry -> pricingContext.exchangeRates()

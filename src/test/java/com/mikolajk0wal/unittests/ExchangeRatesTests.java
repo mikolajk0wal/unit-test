@@ -50,10 +50,58 @@ class ExchangeRatesTests {
     }
 
     @Test
-    void shouldThrowExceptionWhenCurrencyNotFound() {
+    void shouldMaintainPrecisionDuringCrossConversion() {
+        ExchangeRates rates = new ExchangeRates("USD", Map.of("PLN", new BigDecimal("3")));
+        Money hundredPLN = new Money("100.00", "PLN");
+
+        Money result = rates.convert(hundredPLN, "USD");
+
+        assertThat(result).isEqualTo(new Money("33.33", "USD"));
+    }
+
+    @Test
+    void shouldThrowExceptionWhenSourceCurrencyNotFound() {
         ExchangeRates rates = new ExchangeRates("PLN", Map.of("EUR", new BigDecimal("0.25")));
         Money hundredJPY = new Money("100.00", "JPY");
 
-        assertThatThrownBy(() -> rates.convert(hundredJPY, "PLN")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> rates.convert(hundredJPY, "PLN")).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("JPY");
+    }
+
+    @Test
+    void shouldThrowExceptionWhenTargetCurrencyNotFound() {
+        ExchangeRates rates = new ExchangeRates("PLN", Map.of("EUR", new BigDecimal("0.25")));
+        Money hundredPLN = new Money("100.00", "PLN");
+
+        assertThatThrownBy(() -> rates.convert(hundredPLN, "JPY")).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("JPY");
+    }
+
+    @Test
+    void shouldAllowEmptyRatesMapForBaseCurrencyConversionsOnly() {
+        ExchangeRates rates = new ExchangeRates("PLN", Map.of());
+        Money hundredPLN = new Money("100.00", "PLN");
+
+        Money result = rates.convert(hundredPLN, "PLN");
+
+        assertThat(result).isEqualTo(new Money("100.00", "PLN"));
+    }
+
+    @Test
+    void shouldThrowExceptionWhenBaseCurrencyIsInRatesMap() {
+        assertThatThrownBy(() -> new ExchangeRates("PLN", Map.of("PLN", new BigDecimal("1.00"))))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shouldThrowExceptionWhenRateIsZero() {
+        assertThatThrownBy(() -> new ExchangeRates("PLN", Map.of("EUR", BigDecimal.ZERO)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shouldThrowExceptionWhenRateIsNegative() {
+        assertThatThrownBy(() -> new ExchangeRates("PLN", Map.of("EUR", new BigDecimal("-0.25"))))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

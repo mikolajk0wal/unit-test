@@ -6,20 +6,27 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-record CurrencyPair(String source, String target) { }
+record CurrencyPair(String source, String target) {
+}
 
 class ExchangeRates {
     private final Map<CurrencyPair, BigDecimal> rates;
 
     ExchangeRates(String baseCurrency, Map<String, BigDecimal> baseRates) {
+        if (baseRates.containsKey(baseCurrency)) {
+            throw new IllegalArgumentException("Base currency cannot be present in the rates map");
+        }
+
+        baseRates.forEach((currency, rate) -> {
+            if (rate.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException("Exchange rate must be strictly positive, got: " + rate);
+            }
+        });
+
         this.rates = calculateRatesMap(baseCurrency, baseRates);
     }
 
     Money convert(Money money, String targetCurrency) {
-        if (money.currency().equals(targetCurrency)) {
-            return money;
-        }
-
         CurrencyPair pair = new CurrencyPair(money.currency(), targetCurrency);
         BigDecimal rate = rates.get(pair);
 
