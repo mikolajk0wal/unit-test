@@ -2,71 +2,92 @@ package com.mikolajk0wal.unittests;
 
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.mikolajk0wal.unittests.Fixtures.eurToPln;
+import static com.mikolajk0wal.unittests.Fixtures.productPricedAt;
+import static com.mikolajk0wal.unittests.PriceBreakdownAssert.assertThat;
+import static com.mikolajk0wal.unittests.PricingContextBuilder.aPricingContext;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
 class PriceCalculatorTests {
-    private final PriceCalculator calculator = new PriceCalculator();
+	private final PriceCalculator calculator = new PriceCalculator();
 
-    @Test
-    void shouldCalculatePriceBreakdownForMixedCurrencyProducts() {
-        ExchangeRates rates = new ExchangeRates("EUR", Map.of("PLN", new BigDecimal("4.00")));
-        Product p1 = new Product("Product 1", new Money("10.00", "EUR"));
-        Product p2 = new Product("Product 2", new Money("20.00", "PLN"));
-        PricingContext context = new PricingContext(Map.of(p1, 2, p2, 3), rates, "PLN");
+	@Test
+	void shouldCalculatePriceBreakdownForMixedCurrencyProducts() {
+		// Given
+		Product socks = productPricedAt(new Money("10.00", "EUR"));
+		Product tShirt = productPricedAt(new Money("90.00", "PLN"));
 
-        PriceBreakdown result = calculator.calculate(context);
+		// And
+		PricingContext context = aPricingContext()
+				.withItem(socks, 3)
+				.withItem(tShirt, 2)
+				.usingRates(eurToPln("4.00"))
+				.in("PLN")
+				.build();
 
-        assertThat(result.total()).isEqualTo(new Money("140.00", "PLN"));
-        assertThat(result.pricingLines()).hasSize(2).containsEntry(p1.id(), new Money("80.00", "PLN"))
-                .containsEntry(p2.id(), new Money("60.00", "PLN"));
-    }
+		// When
+		PriceBreakdown result = calculator.calculate(context);
 
-    @Test
-    void shouldCalculatePriceForSingleProductCart() {
-        ExchangeRates rates = new ExchangeRates("PLN", Map.of());
-        Product p1 = new Product("Product 1", new Money("50.00", "PLN"));
-        PricingContext context = new PricingContext(Map.of(p1, 1), rates, "PLN");
+		// Then
+		assertThat(result)
+				.hasTotal("300.00", "PLN")
+				.hasLinesCount(2)
+				.hasLine(socks, "120.00", "PLN")
+				.hasLine(tShirt, "180.00", "PLN");
+	}
 
-        PriceBreakdown result = calculator.calculate(context);
+	@Test
+	void shouldCalculatePriceForSingleProductCart() {
+		// Given
+		Product tShirt = productPricedAt(new Money("90.00", "PLN"));
+		PricingContext context = aPricingContext()
+                .withItem(tShirt, 1)
+                .in("PLN")
+                .build();
 
-        assertThat(result.total()).isEqualTo(new Money("50.00", "PLN"));
-        assertThat(result.pricingLines()).hasSize(1).containsEntry(p1.id(), new Money("50.00", "PLN"));
-    }
+		// When
+		PriceBreakdown result = calculator.calculate(context);
 
-    @Test
-    void shouldResultInZeroPriceWhenNoProductsAreProvided() {
-        ExchangeRates rates = new ExchangeRates("PLN", Map.of());
-        PricingContext context = new PricingContext(Map.of(), rates, "PLN");
+		// Then
+		assertThat(result)
+                .hasTotal("90.00", "PLN")
+                .hasLine(tShirt, "90.00", "PLN");
+	}
 
-        PriceBreakdown result = calculator.calculate(context);
+	@Test
+	void shouldResultInZeroPriceWhenNoProductsAreProvided() {
+		// Given
+		PricingContext context = aPricingContext().build();
 
-        assertThat(result.total()).isEqualTo(Money.zero("PLN"));
-        assertThat(result.pricingLines()).isEmpty();
-    }
+		// When
+		PriceBreakdown result = calculator.calculate(context);
 
-    @Test
-    void shouldResultInZeroPriceWhenProductQuantityIsZero() {
-        ExchangeRates rates = new ExchangeRates("USD", Map.of());
-        Product p1 = new Product("Product 1", new Money("100.00", "USD"));
-        PricingContext context = new PricingContext(Map.of(p1, 0), rates, "USD");
+		// Then
+		assertThat(result).hasTotal("0.00", "PLN");
+	}
 
-        PriceBreakdown result = calculator.calculate(context);
+	@Test
+	void shouldResultInZeroPriceWhenProductQuantityIsZero() {
+		// Given
+		Product tShirt = productPricedAt(new Money("90.00", "PLN"));
+		PricingContext context = aPricingContext().withItem(tShirt, 0).in("PLN").build();
 
-        assertThat(result.total()).isEqualTo(Money.zero("USD"));
-        assertThat(result.pricingLines()).hasSize(1).containsEntry(p1.id(), Money.zero("USD"));
-    }
+		// When
+		PriceBreakdown result = calculator.calculate(context);
 
-    @Test
-    void shouldThrowExceptionWhenProductQuantityIsNegative() {
-        ExchangeRates rates = new ExchangeRates("PLN", Map.of());
-        Product p1 = new Product("Product 1", new Money("10.00", "PLN"));
+		// Then
+		assertThat(result)
+                .hasTotal("0.00", "PLN")
+                .hasLine(tShirt, "0.00", "PLN");
+	}
 
-        PricingContext context = new PricingContext(Map.of(p1, -1), rates, "PLN");
+	@Test
+	void shouldThrowExceptionWhenProductQuantityIsNegative() {
+		// Given
+		Product tShirt = productPricedAt(new Money("90.00", "PLN"));
+		PricingContext context = aPricingContext().withItem(tShirt, -1).in("PLN").build();
 
-        assertThatThrownBy(() -> calculator.calculate(context)).isInstanceOf(IllegalArgumentException.class);
-    }
+		// When & Then
+		assertThatThrownBy(() -> calculator.calculate(context)).isInstanceOf(IllegalArgumentException.class);
+	}
 }

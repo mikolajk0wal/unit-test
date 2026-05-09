@@ -10,27 +10,31 @@ import java.util.UUID;
 @Entity
 @Table(name = "products")
 class Product {
-    @Id
-    private UUID id;
-    private String name;
+	@Id
+	private UUID id;
+	private String name;
 
-    @Embedded
-    private Money price;
+	@Embedded
+	private Money price;
 
-    public Product(String name, Money price) {
-        this.id = UUID.randomUUID();
-        this.name = name;
-        this.price = price;
-    }
+	public Product(String name, Money price) {
+		this.id = UUID.randomUUID();
+		this.name = name;
+		this.price = price;
+	}
 
-    protected Product() {
-    }
+	protected Product() {
+	}
 
-    UUID id() {
-        return id;
-    }
+	UUID id() {
+		return id;
+	}
 
-    Money price() {
-        return price;
-    }
+	String name() {
+		return name;
+	}
+
+	Money price() {
+		return price;
+	}
 }

@@ -15,48 +15,48 @@ import java.util.UUID;
 @Entity
 @Table(name = "orders")
 class Order {
-    @Id
-    private UUID id;
+	@Id
+	private UUID id;
 
-    @Column(name = "lines", columnDefinition = "jsonb")
-    @JdbcTypeCode(SqlTypes.JSON)
-    private List<OrderLine> lines;
+	@Column(name = "lines", columnDefinition = "jsonb")
+	@JdbcTypeCode(SqlTypes.JSON)
+	private List<OrderLine> lines;
 
-    @Embedded
-    private Money totalPrice;
+	@Embedded
+	private Money totalPrice;
 
-    Order(List<OrderLine> lines, Money totalPrice) {
-        this.lines = lines;
-        this.totalPrice = totalPrice;
-    }
+	Order(List<OrderLine> lines, Money totalPrice) {
+		this.lines = lines;
+		this.totalPrice = totalPrice;
+	}
 
-    protected Order() {
-    }
+	protected Order() {
+	}
 
-    UUID id() {
-        return id;
-    }
+	UUID id() {
+		return id;
+	}
 
-    Money totalPrice() {
-        return totalPrice;
-    }
+	Money totalPrice() {
+		return totalPrice;
+	}
 
-    List<OrderLine> lines() {
-        return lines;
-    }
+	List<OrderLine> lines() {
+		return lines;
+	}
 
-    @Override
-    public boolean equals(Object o) {
-        if (o == null || getClass() != o.getClass())
-            return false;
-        Order order = (Order) o;
-        return Objects.equals(id, order.id);
-    }
+	@Override
+	public boolean equals(Object o) {
+		if (o == null || getClass() != o.getClass())
+			return false;
+		Order order = (Order) o;
+		return Objects.equals(id, order.id);
+	}
 
-    @Override
-    public int hashCode() {
-        return Objects.hashCode(id);
-    }
+	@Override
+	public int hashCode() {
+		return Objects.hashCode(id);
+	}
 }
 
 record OrderLine(UUID productId, int quantity, Money linePrice) {

@@ -8,95 +8,133 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.mikolajk0wal.unittests.Fixtures.productPricedAt;
+import static com.mikolajk0wal.unittests.OrderAssert.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
-import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 class OrderServiceTests {
-    private ProductRepository productRepository;
-    private OrderRepository orderRepository;
-    private EmailService emailService;
-    private OrderService orderService;
+	private ProductRepository productRepository;
+	private OrderRepository orderRepository;
+	private EmailService emailService;
+	private OrderService orderService;
 
-    @BeforeEach
-    void setup() {
-        productRepository = new InMemoryProductRepository();
-        orderRepository = new InMemoryOrderRepository();
-        PriceCalculator priceCalculator = new PriceCalculator();
+	@BeforeEach
+	void setup() {
+		productRepository = new InMemoryProductRepository();
+		orderRepository = new InMemoryOrderRepository();
+		PriceCalculator priceCalculator = new PriceCalculator();
 
-        ExchangeRateProvider exchangeRateProvider = () -> new ExchangeRates("PLN",
-                Map.of("EUR", new BigDecimal("0.25"), "GBP", new BigDecimal("0.20"), "CHF", new BigDecimal("0.22")));
+		ExchangeRateProvider exchangeRateProvider = () -> new ExchangeRates("PLN",
+				Map.of("EUR", new BigDecimal("0.25"), "GBP", new BigDecimal("0.20"), "CHF", new BigDecimal("0.22")));
 
-        emailService = mock(EmailService.class);
+		emailService = mock(EmailService.class);
 
-        orderService = new OrderService(productRepository, orderRepository, priceCalculator, exchangeRateProvider,
-                emailService);
-    }
+		orderService = new OrderService(productRepository, orderRepository, priceCalculator, exchangeRateProvider,
+				emailService);
+	}
 
-    @Test
-    void shouldCreateOrderWithCorrectPrice() {
-        Product product = productRepository.save(new Product("Product", new Money("1000", "EUR")));
-        List<OrderLineRequest> requests = List.of(new OrderLineRequest(product.id(), 2));
+	@Test
+	void shouldCreateOrderWithCorrectPrice() {
+		// Given
+		Product tShirt = persisted(productPricedAt(new Money("25", "EUR")));
 
-        UUID orderId = orderService.createOrder(requests, "test@gmail.com", "PLN");
+		// And
+		List<OrderLineRequest> requests = List.of(new OrderLineRequest(tShirt.id(), 2));
 
-        Order savedOrder = orderRepository.findById(orderId).orElseThrow();
-        assertThat(savedOrder.totalPrice().amount()).isEqualByComparingTo(new BigDecimal("8000"));
-        assertThat(savedOrder.totalPrice().currency()).isEqualTo("PLN");
-    }
+		// When
+		UUID orderId = orderService.createOrder(requests, "test@gmail.com", "PLN");
 
-    @Test
-    void shouldCreateOrderWithMultipleDifferentProducts() {
-        Product p1 = productRepository.save(new Product("Product 1", new Money("10.00", "PLN")));
-        Product p2 = productRepository.save(new Product("Product 2", new Money("20.00", "PLN")));
-        List<OrderLineRequest> requests = List.of(new OrderLineRequest(p1.id(), 1), new OrderLineRequest(p2.id(), 2));
+		// Then
+		Order order = orderRepository.findById(orderId).orElseThrow();
+		assertThat(order).hasTotal("200", "PLN");
+	}
 
-        UUID orderId = orderService.createOrder(requests, "test@gmail.com", "PLN");
+	@Test
+	void shouldCreateOrderWithMultipleDifferentProducts() {
+		// Given
+		Product socks = persisted(productPricedAt(new Money("10.00", "EUR")));
+		Product tShirt = persisted(productPricedAt(new Money("90.00", "PLN")));
 
-        Order savedOrder = orderRepository.findById(orderId).orElseThrow();
-        assertThat(savedOrder.lines()).anyMatch(l -> l.productId().equals(p1.id()));
-        assertThat(savedOrder.lines()).anyMatch(l -> l.productId().equals(p2.id()));
-    }
+		// And
+		List<OrderLineRequest> requests = List
+				.of(new OrderLineRequest(socks.id(), 1), new OrderLineRequest(tShirt.id(), 2));
 
-    @Test
-    void shouldMergeQuantitiesWhenSameProductAppearsInMultipleLines() {
-        Product product = productRepository.save(new Product("Product", new Money("10.00", "PLN")));
-        List<OrderLineRequest> requests = List.of(new OrderLineRequest(product.id(), 2),
-                new OrderLineRequest(product.id(), 3));
+		// When
+		UUID orderId = orderService.createOrder(requests, "test@gmail.com", "PLN");
 
-        UUID orderId = orderService.createOrder(requests, "test@gmail.com", "PLN");
+		// Then
+		Order order = orderRepository.findById(orderId).orElseThrow();
+		assertThat(order)
+                .hasLine(socks, 1)
+                .hasLine(tShirt, 2);
+	}
 
-        Order savedOrder = orderRepository.findById(orderId).orElseThrow();
-        assertThat(savedOrder.lines()).hasSize(1);
-        assertThat(savedOrder.lines().get(0).quantity()).isEqualTo(5);
-        assertThat(savedOrder.totalPrice()).isEqualTo(new Money("50", "PLN"));
-    }
+	@Test
+	void shouldMergeQuantitiesWhenSameProductAppearsInMultipleLines() {
+		// Given
+		Product socks = persisted(productPricedAt(new Money("10.00", "EUR")));
 
-    @Test
-    void shouldThrowExceptionWhenCartIsEmpty() {
-        List<OrderLineRequest> requests = List.of();
+		// And
+		List<OrderLineRequest> requests = List
+				.of(new OrderLineRequest(socks.id(), 2), new OrderLineRequest(socks.id(), 3));
 
-        assertThatThrownBy(() -> orderService.createOrder(requests, "test@gmail.com", "PLN"))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
+		// When
+		UUID orderId = orderService.createOrder(requests, "test@gmail.com", "EUR");
 
-    @Test
-    void shouldThrowExceptionWhenProductDoesNotExist() {
-        UUID nonExistentId = UUID.randomUUID();
-        List<OrderLineRequest> requests = List.of(new OrderLineRequest(nonExistentId, 1));
+		// Then
+		Order order = orderRepository.findById(orderId).orElseThrow();
+		assertThat(order)
+                .hasLinesCount(1)
+                .hasLine(socks, 5)
+                .hasTotal("50", "EUR");
+	}
 
-        assertThatThrownBy(() -> orderService.createOrder(requests, "test@gmail.com", "PLN"))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("not found");
-    }
+	@Test
+	void shouldThrowExceptionWhenCartIsEmpty() {
+		// Given
+		List<OrderLineRequest> requests = List.of();
 
-    @Test
-    void shouldSendConfirmationEmail() {
-        Product product = productRepository.save(new Product("Product", new Money("1000", "EUR")));
-        List<OrderLineRequest> requests = List.of(new OrderLineRequest(product.id(), 2));
+		// When & Then
+		assertThatThrownBy(() -> orderService.createOrder(requests, "test@gmail.com", "PLN"))
+				.isInstanceOf(IllegalArgumentException.class);
+	}
 
-        orderService.createOrder(requests, "test@gmail.com", "PLN");
+	@Test
+	void shouldThrowExceptionWhenProductDoesNotExist() {
+		// Given
+		UUID nonExistentId = UUID.randomUUID();
 
-        verify(emailService).sendEmail("test@gmail.com", "Your order has been created");
-    }
+		// And
+		List<OrderLineRequest> requests = List.of(new OrderLineRequest(nonExistentId, 1));
+
+		// When & Then
+		assertThatThrownBy(() -> orderService.createOrder(requests, "test@gmail.com", "PLN"))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("not found");
+	}
+
+	@Test
+	void shouldSendConfirmationEmail() {
+		// Given
+		Product product = persisted(productPricedAt(new Money("1000", "PLN")));
+
+		// And
+		List<OrderLineRequest> requests = List.of(new OrderLineRequest(product.id(), 2));
+
+		// When
+		orderService.createOrder(requests, "test@gmail.com", "PLN");
+
+		// Then
+		confirmationEmailWasSentTo("test@gmail.com");
+	}
+
+	private Product persisted(Product product) {
+		return productRepository.save(product);
+	}
+
+	private void confirmationEmailWasSentTo(String email) {
+		verify(emailService).sendEmail(email, "Your order has been created");
+	}
 }
