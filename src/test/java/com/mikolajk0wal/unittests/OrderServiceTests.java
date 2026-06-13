@@ -4,6 +4,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -15,126 +18,127 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 class OrderServiceTests {
-	private ProductRepository productRepository;
-	private OrderRepository orderRepository;
-	private EmailService emailService;
-	private OrderService orderService;
+    private static final LocalDateTime JUNE_1_2026_9_30 = LocalDateTime.of(2026, 6, 1, 9, 30);
+    private ProductRepository productRepository;
+    private OrderRepository orderRepository;
+    private EmailService emailService;
+    private OrderService orderService;
 
-	@BeforeEach
-	void setup() {
-		productRepository = new InMemoryProductRepository();
-		orderRepository = new InMemoryOrderRepository();
-		PriceCalculator priceCalculator = new PriceCalculator();
+    @BeforeEach
+    void setup() {
+        productRepository = new InMemoryProductRepository();
+        orderRepository = new InMemoryOrderRepository();
+        PriceCalculator priceCalculator = new PriceCalculator();
 
-		ExchangeRateProvider exchangeRateProvider = () -> new ExchangeRates("PLN",
-				Map.of("EUR", new BigDecimal("0.25"), "GBP", new BigDecimal("0.20"), "CHF", new BigDecimal("0.22")));
+        ExchangeRateProvider exchangeRateProvider = () -> new ExchangeRates("PLN",
+                Map.of("EUR", new BigDecimal("0.25"), "GBP", new BigDecimal("0.20"), "CHF", new BigDecimal("0.22")));
 
-		emailService = mock(EmailService.class);
+        emailService = mock(EmailService.class);
 
-		orderService = new OrderService(productRepository, orderRepository, priceCalculator, exchangeRateProvider,
-				emailService);
-	}
+        Clock clock = Clock.fixed(JUNE_1_2026_9_30.toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
+        orderService = new OrderService(productRepository, orderRepository, priceCalculator, exchangeRateProvider,
+                emailService, clock);
 
-	@Test
-	void shouldCreateOrderWithCorrectPrice() {
-		// Given
-		Product tShirt = persisted(productPricedAt(new Money("25", "EUR")));
+    }
 
-		// And
-		List<OrderLineRequest> requests = List.of(new OrderLineRequest(tShirt.id(), 2));
+    @Test
+    void shouldCreateOrderWithCorrectPrice() {
+        // Given
+        Product tShirt = persisted(productPricedAt(new Money("25", "EUR")));
 
-		// When
-		UUID orderId = orderService.createOrder(requests, "test@gmail.com", "PLN");
+        // And
+        List<OrderLineRequest> requests = List.of(new OrderLineRequest(tShirt.id(), 2));
 
-		// Then
-		Order order = orderRepository.findById(orderId).orElseThrow();
-		assertThat(order).hasTotal("200", "PLN");
-	}
+        // When
+        UUID orderId = orderService.createOrder(requests, "test@gmail.com", "PLN");
 
-	@Test
-	void shouldCreateOrderWithMultipleDifferentProducts() {
-		// Given
-		Product socks = persisted(productPricedAt(new Money("10.00", "EUR")));
-		Product tShirt = persisted(productPricedAt(new Money("90.00", "PLN")));
+        // Then
+        Order order = orderRepository.findById(orderId).orElseThrow();
+        assertThat(order).hasTotal("200", "PLN");
+    }
 
-		// And
-		List<OrderLineRequest> requests = List
-				.of(new OrderLineRequest(socks.id(), 1), new OrderLineRequest(tShirt.id(), 2));
+    @Test
+    void shouldCreateOrderWithMultipleDifferentProducts() {
+        // Given
+        Product socks = persisted(productPricedAt(new Money("10.00", "EUR")));
+        Product tShirt = persisted(productPricedAt(new Money("90.00", "PLN")));
 
-		// When
-		UUID orderId = orderService.createOrder(requests, "test@gmail.com", "PLN");
+        // And
+        List<OrderLineRequest> requests = List.of(new OrderLineRequest(socks.id(), 1),
+                new OrderLineRequest(tShirt.id(), 2));
 
-		// Then
-		Order order = orderRepository.findById(orderId).orElseThrow();
-		assertThat(order)
-                .hasLine(socks, 1)
-                .hasLine(tShirt, 2);
-	}
+        // When
+        UUID orderId = orderService.createOrder(requests, "test@gmail.com", "PLN");
 
-	@Test
-	void shouldMergeQuantitiesWhenSameProductAppearsInMultipleLines() {
-		// Given
-		Product socks = persisted(productPricedAt(new Money("10.00", "EUR")));
+        // Then
+        Order order = orderRepository.findById(orderId).orElseThrow();
+        assertThat(order)
+            .hasLine(socks, 1)
+            .hasLine(tShirt, 2);
+    }
 
-		// And
-		List<OrderLineRequest> requests = List
-				.of(new OrderLineRequest(socks.id(), 2), new OrderLineRequest(socks.id(), 3));
+    @Test
+    void shouldMergeQuantitiesWhenSameProductAppearsInMultipleLines() {
+        // Given
+        Product socks = persisted(productPricedAt(new Money("10.00", "EUR")));
 
-		// When
-		UUID orderId = orderService.createOrder(requests, "test@gmail.com", "EUR");
+        // And
+        List<OrderLineRequest> requests = List.of(new OrderLineRequest(socks.id(), 2),
+                new OrderLineRequest(socks.id(), 3));
 
-		// Then
-		Order order = orderRepository.findById(orderId).orElseThrow();
-		assertThat(order)
-                .hasLinesCount(1)
-                .hasLine(socks, 5)
-                .hasTotal("50", "EUR");
-	}
+        // When
+        UUID orderId = orderService.createOrder(requests, "test@gmail.com", "EUR");
 
-	@Test
-	void shouldThrowExceptionWhenCartIsEmpty() {
-		// Given
-		List<OrderLineRequest> requests = List.of();
+        // Then
+        Order order = orderRepository.findById(orderId).orElseThrow();
+        assertThat(order)
+            .hasLinesCount(1)
+            .hasLine(socks, 5).hasTotal("50", "EUR");
+    }
 
-		// When & Then
-		assertThatThrownBy(() -> orderService.createOrder(requests, "test@gmail.com", "PLN"))
-				.isInstanceOf(IllegalArgumentException.class);
-	}
+    @Test
+    void shouldThrowExceptionWhenCartIsEmpty() {
+        // Given
+        List<OrderLineRequest> requests = List.of();
 
-	@Test
-	void shouldThrowExceptionWhenProductDoesNotExist() {
-		// Given
-		UUID nonExistentId = UUID.randomUUID();
+        // When & Then
+        assertThatThrownBy(() -> orderService.createOrder(requests, "test@gmail.com", "PLN"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 
-		// And
-		List<OrderLineRequest> requests = List.of(new OrderLineRequest(nonExistentId, 1));
+    @Test
+    void shouldThrowExceptionWhenProductDoesNotExist() {
+        // Given
+        UUID nonExistentId = UUID.randomUUID();
 
-		// When & Then
-		assertThatThrownBy(() -> orderService.createOrder(requests, "test@gmail.com", "PLN"))
-				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("not found");
-	}
+        // And
+        List<OrderLineRequest> requests = List.of(new OrderLineRequest(nonExistentId, 1));
 
-	@Test
-	void shouldSendConfirmationEmail() {
-		// Given
-		Product product = persisted(productPricedAt(new Money("1000", "PLN")));
+        // When & Then
+        assertThatThrownBy(() -> orderService.createOrder(requests, "test@gmail.com", "PLN"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("not found");
+    }
 
-		// And
-		List<OrderLineRequest> requests = List.of(new OrderLineRequest(product.id(), 2));
+    @Test
+    void shouldSendConfirmationEmail() {
+        // Given
+        Product product = persisted(productPricedAt(new Money("1000", "PLN")));
 
-		// When
-		orderService.createOrder(requests, "test@gmail.com", "PLN");
+        // And
+        List<OrderLineRequest> requests = List.of(new OrderLineRequest(product.id(), 2));
 
-		// Then
-		confirmationEmailWasSentTo("test@gmail.com");
-	}
+        // When
+        orderService.createOrder(requests, "test@gmail.com", "PLN");
 
-	private Product persisted(Product product) {
-		return productRepository.save(product);
-	}
+        // Then
+        confirmationEmailWasSentTo("test@gmail.com");
+    }
 
-	private void confirmationEmailWasSentTo(String email) {
-		verify(emailService).sendEmail(email, "Your order has been created");
-	}
+    private Product persisted(Product product) {
+        return productRepository.save(product);
+    }
+
+    private void confirmationEmailWasSentTo(String email) {
+        verify(emailService).sendEmail(email, "Your order has been created");
+    }
 }

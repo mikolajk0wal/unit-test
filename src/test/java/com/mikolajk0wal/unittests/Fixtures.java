@@ -4,11 +4,11 @@ import java.math.BigDecimal;
 import java.util.Map;
 
 class Fixtures {
-	static ExchangeRates eurToPln(String rate) {
-		return new ExchangeRates("EUR", Map.of("PLN", new BigDecimal(rate)));
-	}
+    static ExchangeRates eurToPln(String rate) {
+        return new ExchangeRates("EUR", Map.of("PLN", new BigDecimal(rate)));
+    }
 
-	static Product productPricedAt(Money price) {
-		return new Product("Product", price);
-	}
+    static Product productPricedAt(Money price) {
+        return new Product("Product", price);
+    }
 }
