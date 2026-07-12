@@ -1,14 +1,17 @@
 package com.mikolajk0wal.unittests;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 class PricingContextBuilder {
     private final Map<Product, Integer> products = new HashMap<>();
     private ExchangeRates rates = new ExchangeRates("PLN", Map.of());
     private String targetCurrency = "PLN";
-    private LocalDateTime time = LocalDateTime.of(2026, 6, 8, 12, 0);
+    private List<PercentageDiscount> discounts = new ArrayList<>();
 
     private PricingContextBuilder() {
     }
@@ -32,12 +35,12 @@ class PricingContextBuilder {
         return this;
     }
 
-    PricingContextBuilder atTime(LocalDateTime time) {
-        this.time = time;
+    PricingContextBuilder withDiscount(PercentageDiscount discount) {
+        this.discounts.add(discount);
         return this;
     }
 
     PricingContext build() {
-        return new PricingContext(products, rates, targetCurrency, time);
+        return new PricingContext(products, rates, targetCurrency, discounts);
     }
 }

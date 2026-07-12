@@ -21,6 +21,7 @@ class OrderServiceTests {
     private static final LocalDateTime JUNE_1_2026_9_30 = LocalDateTime.of(2026, 6, 1, 9, 30);
     private ProductRepository productRepository;
     private OrderRepository orderRepository;
+    private CustomerRepository customerRepository;
     private EmailService emailService;
     private OrderService orderService;
 
@@ -28,7 +29,10 @@ class OrderServiceTests {
     void setup() {
         productRepository = new InMemoryProductRepository();
         orderRepository = new InMemoryOrderRepository();
+        customerRepository = new InMemoryCustomerRepository();
+
         PriceCalculator priceCalculator = new PriceCalculator();
+        DiscountFactory discountFactory = new DiscountFactory();
 
         ExchangeRateProvider exchangeRateProvider = () -> new ExchangeRates("PLN",
                 Map.of("EUR", new BigDecimal("0.25"), "GBP", new BigDecimal("0.20"), "CHF", new BigDecimal("0.22")));
@@ -36,25 +40,63 @@ class OrderServiceTests {
         emailService = mock(EmailService.class);
 
         Clock clock = Clock.fixed(JUNE_1_2026_9_30.toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
-        orderService = new OrderService(productRepository, orderRepository, priceCalculator, exchangeRateProvider,
-                emailService, clock);
 
+        orderService = new OrderService(productRepository, orderRepository, priceCalculator, exchangeRateProvider,
+                emailService, customerRepository, discountFactory, clock);
     }
 
     @Test
-    void shouldCreateOrderWithCorrectPrice() {
+    void shouldCreateOrderWithCorrectPriceForGoldCustomer() {
         // Given
-        Product tShirt = persisted(productPricedAt(new Money("25", "EUR")));
+        String email = "gold.member@gmail.com";
+        customerRepository.save(new Customer(email, 30, CustomerLevel.GOLD));
 
         // And
+        Product tShirt = persisted(productPricedAt(new Money("25", "EUR")));
         List<OrderLineRequest> requests = List.of(new OrderLineRequest(tShirt.id(), 2));
 
         // When
-        UUID orderId = orderService.createOrder(requests, "test@gmail.com", "PLN");
+        UUID orderId = orderService.createOrder(requests, email, "PLN");
 
         // Then
         Order order = orderRepository.findById(orderId).orElseThrow();
-        assertThat(order).hasTotal("200", "PLN");
+        assertThat(order).hasTotal("180.00", "PLN");
+    }
+
+    @Test
+    void shouldCreateNewBronzeCustomerWhenEmailIsUnknown() {
+        // Given
+        String newEmail = "fresh.rookie@gmail.com";
+        Product tShirt = persisted(productPricedAt(new Money("25", "EUR")));
+        List<OrderLineRequest> requests = List.of(new OrderLineRequest(tShirt.id(), 1));
+
+        // When
+        orderService.createOrder(requests, newEmail, "PLN");
+
+        // Then
+        Customer savedCustomer = customerRepository.findByEmail(newEmail).orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(savedCustomer.level()).isEqualTo(CustomerLevel.BRONZE);
+        org.assertj.core.api.Assertions.assertThat(savedCustomer.completedOrders()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldIncrementCompletedOrdersForExistingCustomer() {
+        // Given
+        String existingEmail = "existing@gmail.com";
+        Customer existingCustomer = new Customer(existingEmail, 3, CustomerLevel.BRONZE);
+        customerRepository.save(existingCustomer);
+
+        // And
+        Product tShirt = persisted(productPricedAt(new Money("25", "EUR")));
+        List<OrderLineRequest> requests = List.of(new OrderLineRequest(tShirt.id(), 1));
+
+        // When
+        orderService.createOrder(requests, existingEmail, "PLN");
+
+        // Then
+        Customer updatedCustomer = customerRepository.findByEmail(existingEmail).orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(updatedCustomer.completedOrders()).isEqualTo(4);
+        org.assertj.core.api.Assertions.assertThat(updatedCustomer.level()).isEqualTo(CustomerLevel.BRONZE);
     }
 
     @Test

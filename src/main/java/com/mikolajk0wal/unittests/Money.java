@@ -29,6 +29,14 @@ record Money(BigDecimal amount, String currency) {
         return new Money(this.amount.add(other.amount), this.currency);
     }
 
+    public Money subtract(Money other) {
+        if (!this.currency.equals(other.currency)) {
+            throw new IllegalArgumentException(
+                    String.format("Cannot subtract different currencies: %s and %s", this.currency, other.currency));
+        }
+        return new Money(this.amount.subtract(other.amount), this.currency);
+    }
+
     Money multiply(BigDecimal rate) {
         Objects.requireNonNull(rate);
         return new Money(this.amount.multiply(rate), this.currency);

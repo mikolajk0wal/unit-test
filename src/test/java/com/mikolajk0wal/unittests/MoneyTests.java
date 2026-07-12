@@ -64,4 +64,31 @@ class MoneyTests {
         assertThat(result.amount()).isEqualByComparingTo(new BigDecimal(expected));
         assertThat(result.currency()).isEqualTo("USD");
     }
+
+    @ParameterizedTest(name = "[{index}] Subtracting {1} {2} from {0} {2} should give {3} {2}")
+    @CsvSource({
+            "10.50, 5.50, EUR, 5.00",
+            "5.00, 0.00, USD, 5.00",
+            "10.254, 5.124, PLN, 5.13",
+            "10.00, 15.00, CHF, -5.00"
+    })
+    void shouldSubtractSameCurrencies(String amount1, String amount2, String currency, String expected) {
+        Money m1 = new Money(amount1, currency);
+        Money m2 = new Money(amount2, currency);
+
+        Money result = m1.subtract(m2);
+
+        assertThat(result.amount()).isEqualByComparingTo(new BigDecimal(expected));
+        assertThat(result.currency()).isEqualTo(currency);
+    }
+
+    @Test
+    void shouldNotSubtractDifferentCurrencies() {
+        Money pln = new Money("10", "PLN");
+        Money usd = new Money("10", "USD");
+
+        assertThatThrownBy(() -> pln.subtract(usd))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Cannot subtract different currencies: PLN and USD");
+    }
 }

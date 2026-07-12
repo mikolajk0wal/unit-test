@@ -2,6 +2,7 @@ package com.mikolajk0wal.unittests;
 
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Random;
 
@@ -12,8 +13,6 @@ import static com.mikolajk0wal.unittests.PricingContextBuilder.aPricingContext;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
 class PriceCalculatorTests {
-    private static final LocalDateTime HAPPY_HOUR = LocalDateTime.of(2026, 6, 5, 20, 30);
-
     private final PriceCalculator calculator = new PriceCalculator();
 
     @Test
@@ -103,7 +102,7 @@ class PriceCalculatorTests {
     }
 
     @Test
-    void shouldApplyTenPercentDiscountDuringHappyHour() {
+    void shouldApplyPercentageDiscount() {
         // Given
         Product tShirt = productPricedAt(new Money("100.00", "PLN"));
         Product socks = productPricedAt(new Money("40.00", "PLN"));
@@ -112,7 +111,7 @@ class PriceCalculatorTests {
                 .withItem(tShirt, 1)
                 .withItem(socks, 2)
                 .in("PLN")
-                .atTime(HAPPY_HOUR)
+                .withDiscount(new PercentageDiscount(new BigDecimal("0.25")))
                 .build();
 
         // When
@@ -120,8 +119,32 @@ class PriceCalculatorTests {
 
         // Then
         assertThat(result)
-                .hasTotal("162.00", "PLN")
-                .hasLine(tShirt, "90.00", "PLN")
-                .hasLine(socks, "72.00", "PLN");
+                .hasTotal("135.00", "PLN")
+                .hasLine(tShirt, "75.00", "PLN")
+                .hasLine(socks, "60.00", "PLN");
+    }
+
+    @Test
+    void shouldCombinePercentageDiscounts() {
+        // Given
+        Product tShirt = productPricedAt(new Money("100.00", "PLN"));
+        Product socks = productPricedAt(new Money("40.00", "PLN"));
+
+        PricingContext context = aPricingContext()
+                .withItem(tShirt, 1)
+                .withItem(socks, 2)
+                .in("PLN")
+                .withDiscount(new PercentageDiscount(new BigDecimal("0.25")))
+                .withDiscount(new PercentageDiscount(new BigDecimal("0.10")))
+                .build();
+
+        // When
+        PriceBreakdown result = calculator.calculate(context);
+
+        // Then
+        assertThat(result)
+                .hasTotal("117.00", "PLN")
+                .hasLine(tShirt, "65.00", "PLN")
+                .hasLine(socks, "52.00", "PLN");
     }
 }

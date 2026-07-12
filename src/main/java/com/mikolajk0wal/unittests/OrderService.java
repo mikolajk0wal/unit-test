@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -14,15 +15,20 @@ class OrderService {
     private final PriceCalculator priceCalculator;
     private final ExchangeRateProvider exchangeRateProvider;
     private final EmailService emailService;
+    private final CustomerRepository customerRepository;
+    private final DiscountFactory discountFactory;
     private final Clock clock;
 
     OrderService(ProductRepository productRepository, OrderRepository orderRepository, PriceCalculator priceCalculator,
-            ExchangeRateProvider exchangeRateProvider, EmailService emailService, Clock clock) {
+            ExchangeRateProvider exchangeRateProvider, EmailService emailService,
+                 CustomerRepository customerRepository, DiscountFactory discountFactory, Clock clock) {
         this.productRepository = productRepository;
         this.orderRepository = orderRepository;
         this.priceCalculator = priceCalculator;
         this.exchangeRateProvider = exchangeRateProvider;
         this.emailService = emailService;
+        this.customerRepository = customerRepository;
+        this.discountFactory = discountFactory;
         this.clock = clock;
     }
 
@@ -43,9 +49,14 @@ class OrderService {
         Map<Product, Integer> productsWithQuantities = products.stream()
                 .collect(Collectors.toMap(Function.identity(), p -> aggregatedQuantities.get(p.id())));
 
+        Customer customer = customerRepository.findByEmail(email)
+                .orElseGet(() -> new Customer(email));
+
+        List<PercentageDiscount> discounts = discountFactory.createDiscounts(customer.level(), LocalDateTime.now(clock));
+
         ExchangeRates exchangeRates = exchangeRateProvider.getExchangeRates();
         PriceBreakdown breakdown = priceCalculator.calculate(
-                new PricingContext(productsWithQuantities, exchangeRates, currency, LocalDateTime.now(clock)));
+                new PricingContext(productsWithQuantities, exchangeRates, currency, discounts));
 
         List<OrderLine> lines = products.stream()
                 .map(p -> new OrderLine(p.id(), productsWithQuantities.get(p), breakdown.pricingLines().get(p.id())))
@@ -53,6 +64,9 @@ class OrderService {
 
         Order order = new Order(lines, breakdown.total());
         orderRepository.save(order);
+
+        customer.registerNewOrder();
+        customerRepository.save(customer);
 
         emailService.sendEmail(email, "Your order has been created");
         return order.id();
