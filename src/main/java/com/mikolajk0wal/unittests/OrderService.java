@@ -1,5 +1,7 @@
 package com.mikolajk0wal.unittests;
 
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -14,24 +16,25 @@ class OrderService {
     private final OrderRepository orderRepository;
     private final PriceCalculator priceCalculator;
     private final ExchangeRateProvider exchangeRateProvider;
-    private final EmailService emailService;
     private final CustomerRepository customerRepository;
     private final DiscountFactory discountFactory;
+    private final EventPublisher eventPublisher;
     private final Clock clock;
 
     OrderService(ProductRepository productRepository, OrderRepository orderRepository, PriceCalculator priceCalculator,
-            ExchangeRateProvider exchangeRateProvider, EmailService emailService,
-                 CustomerRepository customerRepository, DiscountFactory discountFactory, Clock clock) {
+                 ExchangeRateProvider exchangeRateProvider,
+                 CustomerRepository customerRepository, DiscountFactory discountFactory, EventPublisher eventPublisher, Clock clock) {
         this.productRepository = productRepository;
         this.orderRepository = orderRepository;
         this.priceCalculator = priceCalculator;
         this.exchangeRateProvider = exchangeRateProvider;
-        this.emailService = emailService;
         this.customerRepository = customerRepository;
         this.discountFactory = discountFactory;
+        this.eventPublisher = eventPublisher;
         this.clock = clock;
     }
 
+    @Transactional
     UUID createOrder(List<OrderLineRequest> requests, String email, String currency) {
         if (requests.isEmpty()) {
             throw new IllegalArgumentException("Cart cannot be empty");
@@ -65,10 +68,8 @@ class OrderService {
         Order order = new Order(lines, breakdown.total());
         orderRepository.save(order);
 
-        customer.registerNewOrder();
-        customerRepository.save(customer);
+        eventPublisher.publish(new OrderCreated(order.id(), email));
 
-        emailService.sendEmail(email, "Your order has been created");
         return order.id();
     }
 }

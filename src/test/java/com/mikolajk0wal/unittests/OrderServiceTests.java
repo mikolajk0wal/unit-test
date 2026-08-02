@@ -22,7 +22,7 @@ class OrderServiceTests {
     private ProductRepository productRepository;
     private OrderRepository orderRepository;
     private CustomerRepository customerRepository;
-    private EmailService emailService;
+    private EventPublisher eventPublisher;
     private OrderService orderService;
 
     @BeforeEach
@@ -37,12 +37,12 @@ class OrderServiceTests {
         ExchangeRateProvider exchangeRateProvider = () -> new ExchangeRates("PLN",
                 Map.of("EUR", new BigDecimal("0.25"), "GBP", new BigDecimal("0.20"), "CHF", new BigDecimal("0.22")));
 
-        emailService = mock(EmailService.class);
+        eventPublisher = mock(EventPublisher.class);
 
         Clock clock = Clock.fixed(JUNE_1_2026_9_30.toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
 
         orderService = new OrderService(productRepository, orderRepository, priceCalculator, exchangeRateProvider,
-                emailService, customerRepository, discountFactory, clock);
+                customerRepository, discountFactory, eventPublisher, clock);
     }
 
     @Test
@@ -61,42 +61,6 @@ class OrderServiceTests {
         // Then
         Order order = orderRepository.findById(orderId).orElseThrow();
         assertThat(order).hasTotal("180.00", "PLN");
-    }
-
-    @Test
-    void shouldCreateNewBronzeCustomerWhenEmailIsUnknown() {
-        // Given
-        String newEmail = "fresh.rookie@gmail.com";
-        Product tShirt = persisted(productPricedAt(new Money("25", "EUR")));
-        List<OrderLineRequest> requests = List.of(new OrderLineRequest(tShirt.id(), 1));
-
-        // When
-        orderService.createOrder(requests, newEmail, "PLN");
-
-        // Then
-        Customer savedCustomer = customerRepository.findByEmail(newEmail).orElseThrow();
-        org.assertj.core.api.Assertions.assertThat(savedCustomer.level()).isEqualTo(CustomerLevel.BRONZE);
-        org.assertj.core.api.Assertions.assertThat(savedCustomer.completedOrders()).isEqualTo(1);
-    }
-
-    @Test
-    void shouldIncrementCompletedOrdersForExistingCustomer() {
-        // Given
-        String existingEmail = "existing@gmail.com";
-        Customer existingCustomer = new Customer(existingEmail, 3, CustomerLevel.BRONZE);
-        customerRepository.save(existingCustomer);
-
-        // And
-        Product tShirt = persisted(productPricedAt(new Money("25", "EUR")));
-        List<OrderLineRequest> requests = List.of(new OrderLineRequest(tShirt.id(), 1));
-
-        // When
-        orderService.createOrder(requests, existingEmail, "PLN");
-
-        // Then
-        Customer updatedCustomer = customerRepository.findByEmail(existingEmail).orElseThrow();
-        org.assertj.core.api.Assertions.assertThat(updatedCustomer.completedOrders()).isEqualTo(4);
-        org.assertj.core.api.Assertions.assertThat(updatedCustomer.level()).isEqualTo(CustomerLevel.BRONZE);
     }
 
     @Test
@@ -162,7 +126,7 @@ class OrderServiceTests {
     }
 
     @Test
-    void shouldSendConfirmationEmail() {
+    void shouldPublishOrderCreatedEvent() {
         // Given
         Product product = persisted(productPricedAt(new Money("1000", "PLN")));
 
@@ -170,17 +134,13 @@ class OrderServiceTests {
         List<OrderLineRequest> requests = List.of(new OrderLineRequest(product.id(), 2));
 
         // When
-        orderService.createOrder(requests, "test@gmail.com", "PLN");
+        UUID orderId = orderService.createOrder(requests, "test@gmail.com", "PLN");
 
         // Then
-        confirmationEmailWasSentTo("test@gmail.com");
+        verify(eventPublisher).publish(new OrderCreated(orderId, "test@gmail.com"));
     }
 
     private Product persisted(Product product) {
         return productRepository.save(product);
-    }
-
-    private void confirmationEmailWasSentTo(String email) {
-        verify(emailService).sendEmail(email, "Your order has been created");
     }
 }
