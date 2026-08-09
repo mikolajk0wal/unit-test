@@ -26,6 +26,7 @@ class Order {
     private Money totalPrice;
 
     Order(List<OrderLine> lines, Money totalPrice) {
+        this.id = UUID.randomUUID();
         this.lines = lines;
         this.totalPrice = totalPrice;
     }

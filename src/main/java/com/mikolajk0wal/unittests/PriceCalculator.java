@@ -1,5 +1,7 @@
 package com.mikolajk0wal.unittests;
 
+import org.springframework.stereotype.Component;
+
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
@@ -7,6 +9,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Component
 class PriceCalculator {
 
     PriceBreakdown calculate(PricingContext pricingContext) {

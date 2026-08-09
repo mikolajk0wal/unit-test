@@ -1,5 +1,7 @@
 package com.mikolajk0wal.unittests;
 
+import org.springframework.stereotype.Component;
+
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
@@ -8,6 +10,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+@Component
 class DiscountFactory {
 
     List<PercentageDiscount> createDiscounts(CustomerLevel level, LocalDateTime time) {

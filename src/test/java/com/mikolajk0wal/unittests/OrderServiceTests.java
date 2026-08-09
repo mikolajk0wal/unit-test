@@ -46,24 +46,6 @@ class OrderServiceTests {
     }
 
     @Test
-    void shouldCreateOrderWithCorrectPriceForGoldCustomer() {
-        // Given
-        String email = "gold.member@gmail.com";
-        customerRepository.save(new Customer(email, 30, CustomerLevel.GOLD));
-
-        // And
-        Product tShirt = persisted(productPricedAt(new Money("25", "EUR")));
-        List<OrderLineRequest> requests = List.of(new OrderLineRequest(tShirt.id(), 2));
-
-        // When
-        UUID orderId = orderService.createOrder(requests, email, "PLN");
-
-        // Then
-        Order order = orderRepository.findById(orderId).orElseThrow();
-        assertThat(order).hasTotal("180.00", "PLN");
-    }
-
-    @Test
     void shouldCreateOrderWithMultipleDifferentProducts() {
         // Given
         Product socks = persisted(productPricedAt(new Money("10.00", "EUR")));

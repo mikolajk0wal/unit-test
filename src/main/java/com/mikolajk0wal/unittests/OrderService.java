@@ -1,5 +1,6 @@
 package com.mikolajk0wal.unittests;
 
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -11,6 +12,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Service
 class OrderService {
     private final ProductRepository productRepository;
     private final OrderRepository orderRepository;

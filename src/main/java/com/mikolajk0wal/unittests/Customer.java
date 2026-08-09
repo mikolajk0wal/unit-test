@@ -15,6 +15,8 @@ class Customer {
     private CustomerLevel level;
     private int completedOrders;
 
+    protected Customer() {}
+
     public Customer(String email) {
         this(email, 0, CustomerLevel.BRONZE);
     }
